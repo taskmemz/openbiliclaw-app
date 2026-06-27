@@ -1,0 +1,103 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/chat_provider.dart';
+
+class ChatView extends StatefulWidget {
+  const ChatView({super.key});
+
+  @override
+  State<ChatView> createState() => _ChatViewState();
+}
+
+class _ChatViewState extends State<ChatView> {
+  final _controller = TextEditingController();
+  final _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Consumer<ChatProvider>(builder: (context, cp, _) {
+      return Column(children: [
+        AppBar(title: const Text('对话'), centerTitle: true, backgroundColor: theme.colorScheme.surface, elevation: 0),
+        Expanded(child: _buildMessages(cp, theme)),
+        if (cp.responding)
+          const Padding(padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Row(children: [SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
+              SizedBox(width: 8), Text('思考中…', style: TextStyle(fontSize: 12, color: Colors.grey))])),
+        _buildInputBar(cp, theme),
+      ]);
+    });
+  }
+
+  Widget _buildMessages(ChatProvider cp, ThemeData theme) {
+    if (cp.loading) return const Center(child: CircularProgressIndicator());
+    if (cp.turns.isEmpty) {
+      return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.chat_outlined, size: 48, color: Colors.grey[300]),
+        const SizedBox(height: 8),
+        Text('和 AI 聊聊你的口味偏好', style: TextStyle(color: Colors.grey[400], fontSize: 14)),
+      ]));
+    }
+    return ListView.builder(controller: _scrollController,
+      padding: const EdgeInsets.all(16),
+      itemCount: cp.turns.length,
+      itemBuilder: (context, index) {
+        final turn = cp.turns[index];
+        final isUser = turn.isUser;
+        final bubbleColor = isUser ? const Color(0xFFFB7299) : theme.colorScheme.surfaceContainerHighest;
+        final textColor = isUser ? Colors.white : theme.colorScheme.onSurface;
+        final msgRadius = BorderRadius.only(
+          topLeft: const Radius.circular(16),
+          topRight: const Radius.circular(16),
+          bottomLeft: isUser ? const Radius.circular(16) : const Radius.circular(4),
+          bottomRight: isUser ? const Radius.circular(4) : const Radius.circular(16),
+        );
+        final align = isUser ? Alignment.centerRight : Alignment.centerLeft;
+        final msgWidget = Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(color: bubbleColor, borderRadius: msgRadius),
+          child: Text(turn.message, style: TextStyle(color: textColor, fontSize: 14)));
+        return Align(alignment: align, child: msgWidget);
+      });
+  }
+
+  Widget _buildInputBar(ChatProvider cp, ThemeData theme) {
+    return Container(padding: EdgeInsets.only(left: 12, right: 12, top: 8, bottom: MediaQuery.of(context).padding.bottom + 8),
+      decoration: BoxDecoration(color: theme.colorScheme.surface, border: Border(top: BorderSide(color: Colors.grey[200]!))),
+      child: SafeArea(top: false, child: Row(children: [
+        Expanded(child: TextField(controller: _controller,
+          textInputAction: TextInputAction.send,
+          onSubmitted: (v) => _send(cp),
+          decoration: InputDecoration(hintText: '说说你最近想看什么…',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), filled: true,
+            fillColor: theme.colorScheme.surfaceContainerHighest))),
+        const SizedBox(width: 8),
+        IconButton(icon: const Icon(Icons.send_rounded, color: Color(0xFFFB7299)),
+          onPressed: cp.responding ? null : () => _send(cp)),
+      ])));
+  }
+
+  void _send(ChatProvider cp) {
+    final msg = _controller.text.trim();
+    if (msg.isEmpty) return;
+    _controller.clear();
+    cp.sendMessage(msg).then((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(_scrollController.position.maxScrollExtent + 100,
+            duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+        }
+      });
+    });
+  }
+}
