@@ -7,16 +7,8 @@ on:
     branches: [master]
   workflow_dispatch:
     inputs:
-      build_type:
-        description: 'Build type'
-        required: true
-        default: 'debug'
-        type: choice
-        options:
-          - debug
-          - release
       create_release:
-        description: 'Create GitHub Release'
+        description: 'Create GitHub Release (release APK only)'
         required: false
         default: false
         type: boolean
@@ -26,7 +18,7 @@ env:
 
 jobs:
   build:
-    name: Build APK
+    name: Build APKs
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -48,41 +40,63 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-pub || true
 
+      # ── Release 签名 ──
+      - name: Decode keystore
+        if: ${{ env.ANDROID_RELEASE_KEY != '' }}
+        env:
+          ANDROID_RELEASE_KEY: ${{ secrets.ANDROID_RELEASE_KEY }}
+        run: echo "$ANDROID_RELEASE_KEY" | base64 -d > /tmp/upload-keystore.jks
+
+      - name: Create key.properties
+        if: ${{ env.ANDROID_RELEASE_KEY != '' }}
+        env:
+          ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+        run: |
+          cat > android/key.properties <<EOF
+          storePassword=$ANDROID_RELEASE_KEY_PASSWORD
+          keyPassword=$ANDROID_RELEASE_KEY_PASSWORD
+          keyAlias=upload
+          storeFile=/tmp/upload-keystore.jks
+          EOF
+
+      - name: Patch build.gradle.kts for release signing
+        if: ${{ env.ANDROID_RELEASE_KEY != '' }}
+        env:
+          ANDROID_RELEASE_KEY: ${{ secrets.ANDROID_RELEASE_KEY }}
+        run: |
+          sed -i 's|signingConfig = signingConfigs.getByName("debug")|signingConfig = signingConfigs.getByName("release")|' android/app/build.gradle.kts
+          sed -i '/android {/a\n    signingConfigs {
+        release {
+            keyAlias = "upload"
+            keyPassword = System.getenv("ANDROID_RELEASE_KEY_PASSWORD")
+            storeFile = file(System.getenv("KEYSTORE_PATH") ?: "/tmp/upload-keystore.jks")
+            storePassword = System.getenv("ANDROID_RELEASE_KEY_PASSWORD")
+        }
+    }' android/app/build.gradle.kts
+
+      # ── 构建 ──
       - name: Build APK (debug)
-        if: >-
-          github.event_name == 'push' ||
-          github.event_name == 'pull_request' ||
-          (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'debug')
         run: flutter build apk --debug
 
       - name: Build APK (release)
-        if: >-
-          github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release'
         run: flutter build apk --release
 
-      - name: Upload APK (debug)
-        if: >-
-          github.event_name == 'push' ||
-          github.event_name == 'pull_request' ||
-          (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'debug')
+      # ── 上传产物 ──
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: openbiliclaw-app-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
 
-      - name: Upload APK (release)
-        if: >-
-          github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release'
+      - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
           name: openbiliclaw-app-release
           path: build/app/outputs/flutter-apk/app-release.apk
 
+      # ── Release ──
       - name: Get version
-        if: >-
-          github.event_name == 'workflow_dispatch' &&
-          github.event.inputs.create_release == 'true' &&
-          github.event.inputs.build_type == 'release'
+        if: github.event.inputs.create_release == 'true'
         id: version
         run: |
           VERSION=$(grep 'version:' pubspec.yaml | head -1 | awk '{print $2}')
@@ -90,15 +104,12 @@ jobs:
           echo "tag=v$VERSION" >> $GITHUB_OUTPUT
 
       - name: Create Release
-        if: >-
-          github.event_name == 'workflow_dispatch' &&
-          github.event.inputs.create_release == 'true' &&
-          github.event.inputs.build_type == 'release'
+        if: github.event.inputs.create_release == 'true'
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ steps.version.outputs.tag }}
           name: "OpenBiliClaw App ${{ steps.version.outputs.version }}"
-          artifacts: "build/app/outputs/flutter-apk/app-release.apk"
+          artifacts: "build/app/outputs/flutter-apk/app-release.apk,build/app/outputs/flutter-apk/app-debug.apk"
           generateReleaseNotes: true
           draft: true
           token: ${{ secrets.GITHUB_TOKEN }}
