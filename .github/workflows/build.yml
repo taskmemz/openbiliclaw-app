@@ -20,6 +20,8 @@ jobs:
   build:
     name: Build APKs
     runs-on: ubuntu-latest
+    env:
+      HAS_RELEASE_KEY: *** secrets.ANDROID_RELEASE_KEY != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,13 +44,13 @@ jobs:
 
       # ── Release 签名（可选）──
       - name: Decode keystore
-        if: ${{ secrets.ANDROID_RELEASE_KEY != '' }}
+        if: env.HAS_RELEASE_KEY == 'true'
         env:
-          ANDROID_RELEASE_KEY: ${{ secrets.ANDROID_RELEASE_KEY }}
+          ANDROID_RELEASE_KEY: *** secrets.ANDROID_RELEASE_KEY }}
         run: echo "$ANDROID_RELEASE_KEY" | base64 -d > /tmp/upload-keystore.jks
 
       - name: Write key.properties
-        if: ${{ secrets.ANDROID_RELEASE_KEY != '' }}
+        if: env.HAS_RELEASE_KEY == 'true'
         env:
           PWD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
         run: |
@@ -76,7 +78,7 @@ jobs:
 
       # ── Release ──
       - name: Get version
-        if: ${{ github.event.inputs.create_release == 'true' }}
+        if: github.event.inputs.create_release == 'true'
         id: version
         run: |
           VERSION=$(grep 'version:' pubspec.yaml | head -1 | awk '{print $2}')
@@ -84,7 +86,7 @@ jobs:
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Create Release
-        if: ${{ github.event.inputs.create_release == 'true' }}
+        if: github.event.inputs.create_release == 'true'
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ steps.version.outputs.tag }}
