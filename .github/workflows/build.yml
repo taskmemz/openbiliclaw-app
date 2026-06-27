@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       create_release:
-        description: 'Create GitHub Release (release APK only)'
+        description: 'Create GitHub Release (draft)'
         required: false
         default: false
         type: boolean
@@ -40,39 +40,20 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-pub || true
 
-      # ── Release 签名 ──
+      # ── Release 签名（可选，没有 secrets 则用 debug 签名）──
       - name: Decode keystore
-        if: ${{ env.ANDROID_RELEASE_KEY != '' }}
+        if: ${{ secrets.ANDROID_RELEASE_KEY != '' }}
         env:
           ANDROID_RELEASE_KEY: ${{ secrets.ANDROID_RELEASE_KEY }}
-        run: echo "$ANDROID_RELEASE_KEY" | base64 -d > /tmp/upload-keystore.jks
-
-      - name: Create key.properties
-        if: ${{ env.ANDROID_RELEASE_KEY != '' }}
-        env:
           ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
         run: |
+          echo "$ANDROID_RELEASE_KEY" | base64 -d > /tmp/upload-keystore.jks
           cat > android/key.properties <<EOF
           storePassword=$ANDROID_RELEASE_KEY_PASSWORD
           keyPassword=$ANDROID_RELEASE_KEY_PASSWORD
           keyAlias=upload
           storeFile=/tmp/upload-keystore.jks
           EOF
-
-      - name: Patch build.gradle.kts for release signing
-        if: ${{ env.ANDROID_RELEASE_KEY != '' }}
-        env:
-          ANDROID_RELEASE_KEY: ${{ secrets.ANDROID_RELEASE_KEY }}
-        run: |
-          sed -i 's|signingConfig = signingConfigs.getByName("debug")|signingConfig = signingConfigs.getByName("release")|' android/app/build.gradle.kts
-          sed -i '/android {/a\n    signingConfigs {
-        release {
-            keyAlias = "upload"
-            keyPassword = System.getenv("ANDROID_RELEASE_KEY_PASSWORD")
-            storeFile = file(System.getenv("KEYSTORE_PATH") ?: "/tmp/upload-keystore.jks")
-            storePassword = System.getenv("ANDROID_RELEASE_KEY_PASSWORD")
-        }
-    }' android/app/build.gradle.kts
 
       # ── 构建 ──
       - name: Build APK (debug)
