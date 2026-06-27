@@ -1,15 +1,16 @@
 plugins {
     id("com.android.application")
     id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// 读取 key.properties（存在时用 release 签名，不存在时用 debug）
-def keystoreProperties = new Properties()
-def keystorePropertiesFile = rootProject.file('key.properties')
+import java.io.FileInputStream
+import java.util.Properties
+
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
 android {
@@ -27,11 +28,11 @@ android {
     }
 
     signingConfigs {
-        release {
-            keyAlias keystoreProperties['keyAlias'] ?: ''
-            keyPassword keystoreProperties['keyPassword'] ?: ''
-            storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
-            storePassword keystoreProperties['storePassword'] ?: ''
+        create("release") {
+            keyAlias = keystoreProperties["keyAlias"] as? String ?: ""
+            keyPassword = keystoreProperties["keyPassword"] as? String ?: ""
+            storeFile = (keystoreProperties["storeFile"] as? String)?.let { file(it) }
+            storePassword = keystoreProperties["storePassword"] as? String ?: ""
         }
     }
 
@@ -45,9 +46,11 @@ android {
 
     buildTypes {
         release {
-            signingConfig = keystorePropertiesFile.exists()
-                ? signingConfigs.release
-                : signingConfigs.debug
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
