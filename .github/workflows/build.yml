@@ -1,0 +1,104 @@
+name: Build Flutter App
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release
+      create_release:
+        description: 'Create GitHub Release'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  FLUTTER_VERSION: '3.27.0'
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Flutter info
+        run: flutter doctor -v
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --no-pub || true
+
+      - name: Build APK (debug)
+        if: >-
+          github.event_name == 'push' ||
+          github.event_name == 'pull_request' ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'debug')
+        run: flutter build apk --debug
+
+      - name: Build APK (release)
+        if: >-
+          github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release'
+        run: flutter build apk --release
+
+      - name: Upload APK (debug)
+        if: >-
+          github.event_name == 'push' ||
+          github.event_name == 'pull_request' ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'debug')
+        uses: actions/upload-artifact@v4
+        with:
+          name: openbiliclaw-app-debug
+          path: build/app/outputs/flutter-apk/app-debug.apk
+
+      - name: Upload APK (release)
+        if: >-
+          github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: openbiliclaw-app-release
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Get version
+        if: >-
+          github.event_name == 'workflow_dispatch' &&
+          github.event.inputs.create_release == 'true' &&
+          github.event.inputs.build_type == 'release'
+        id: version
+        run: |
+          VERSION=$(grep 'version:' pubspec.yaml | head -1 | awk '{print $2}')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        if: >-
+          github.event_name == 'workflow_dispatch' &&
+          github.event.inputs.create_release == 'true' &&
+          github.event.inputs.build_type == 'release'
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.version.outputs.tag }}
+          name: "OpenBiliClaw App ${{ steps.version.outputs.version }}"
+          artifacts: "build/app/outputs/flutter-apk/app-release.apk"
+          generateReleaseNotes: true
+          draft: true
+          token: ${{ secrets.GITHUB_TOKEN }}
