@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/recommend_provider.dart';
-import '../models/recommendation.dart';
 import '../widgets/recommendation_card.dart';
 import '../widgets/delight_banner.dart';
 
@@ -11,6 +11,7 @@ class RecommendView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Consumer<RecommendProvider>(builder: (context, rp, _) {
+      final delightsCount = rp.delights.length;
       return RefreshIndicator(onRefresh: () => rp.load(),
         child: CustomScrollView(slivers: [
           SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
@@ -30,22 +31,30 @@ class RecommendView extends StatelessWidget {
               decoration: BoxDecoration(color: Colors.orange[50], borderRadius: BorderRadius.circular(12)),
               child: const Row(children: [Icon(Icons.wifi_off, size: 16, color: Colors.orange), SizedBox(width: 8),
                 Text('无法连接后端', style: TextStyle(fontSize: 13, color: Colors.orange))]))),
-          if (rp.delights.isNotEmpty)
-            SliverToBoxAdapter(child: SizedBox(
-              height: 180,
-              child: PageView.builder(
-                itemCount: rp.delights.length,
-                itemBuilder: (context, index) {
-                  final d = rp.delights[index];
-                  return DelightBanner(delight: d, currentIndex: index, totalCount: rp.delights.length,
-                    onPrev: null, onNext: null,
-                    onView: () => rp.reportClick(Recommendation(id: 0, bvid: d.bvid, title: d.title, coverUrl: d.coverUrl)),
-                    onLike: () => rp.respondToDelight(d.bvid, 'like'),
-                    onDislike: () => rp.respondToDelight(d.bvid, 'dislike'),
-                    onDismiss: () => rp.respondToDelight(d.bvid, 'dismiss'));
-                },
-              ),
+          if (delightsCount > 0) ...[
+            SliverToBoxAdapter(child: DelightBanner(
+              delight: rp.delights[rp.delightIndex.clamp(0, delightsCount - 1)],
+              currentIndex: rp.delightIndex, totalCount: delightsCount,
+              onPrev: () => rp.prevDelight(),
+              onNext: () => rp.nextDelight(),
+              onView: () {
+                final d = rp.delights[rp.delightIndex.clamp(0, delightsCount - 1)];
+                _openUrl(context, d.contentUrl.isNotEmpty ? d.contentUrl : 'https://www.bilibili.com/video/${d.bvid}');
+              },
+              onLike: () {
+                final d = rp.delights[rp.delightIndex.clamp(0, delightsCount - 1)];
+                rp.respondToDelight(d.bvid, 'like');
+              },
+              onDislike: () {
+                final d = rp.delights[rp.delightIndex.clamp(0, delightsCount - 1)];
+                rp.respondToDelight(d.bvid, 'dislike');
+              },
+              onDismiss: () {
+                final d = rp.delights[rp.delightIndex.clamp(0, delightsCount - 1)];
+                rp.respondToDelight(d.bvid, 'dismiss');
+              },
             )),
+          ],
           if (rp.loading && rp.recommendations.isEmpty)
             const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
           else if (rp.recommendations.isEmpty)
@@ -60,7 +69,11 @@ class RecommendView extends StatelessWidget {
             SliverList(delegate: SliverChildListDelegate(
               rp.recommendations.map((rec) => RecommendationCard(
                 rec: rec,
-                onTap: () { rp.reportClick(rec); },
+                onTap: () {
+                  rp.reportClick(rec);
+                  final url = rp.contentUrlFor(rec);
+                  if (url != null) _openUrl(context, url);
+                },
                 onLike: () => rp.submitFeedback(rec.bvid, 'like'),
                 onDislike: () => rp.submitFeedback(rec.bvid, 'dislike'),
               )).toList(),
@@ -70,5 +83,14 @@ class RecommendView extends StatelessWidget {
               child: Center(child: TextButton(onPressed: () => rp.append(), child: Text(rp.loading ? '加载中…' : '加载更多推荐', style: const TextStyle(color: Color(0xFFFB7299))))))),
         ]));
     });
+  }
+
+  void _openUrl(BuildContext context, String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri != null) {
+      try {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (_) {}
+    }
   }
 }

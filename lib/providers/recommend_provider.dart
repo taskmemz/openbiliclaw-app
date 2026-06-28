@@ -10,6 +10,7 @@ class RecommendProvider extends ChangeNotifier {
 
   List<Recommendation> _recommendations = [];
   List<Delight> _delights = [];
+  int _delightIndex = 0;
   bool _loading = false;
   bool _online = false;
   String _runtimeSummary = '';
@@ -19,16 +20,39 @@ class RecommendProvider extends ChangeNotifier {
 
   List<Recommendation> get recommendations => _recommendations;
   List<Delight> get delights => _delights;
+  int get delightIndex => _delightIndex;
   bool get loading => _loading;
   bool get online => _online;
   String get runtimeSummary => _runtimeSummary;
+
+  void setDelightIndex(int i) {
+    if (i >= 0 && i < _delights.length) _delightIndex = i;
+  }
+
+  void nextDelight() {
+    if (_delights.isNotEmpty) _delightIndex = (_delightIndex + 1) % _delights.length;
+    notifyListeners();
+  }
+
+  void prevDelight() {
+    if (_delights.isNotEmpty) _delightIndex = (_delightIndex - 1 + _delights.length) % _delights.length;
+    notifyListeners();
+  }
+
+  String? contentUrlFor(Recommendation rec) {
+    if (rec.contentUrl.isNotEmpty) return rec.contentUrl;
+    if (rec.bvid.isNotEmpty) return 'https://www.bilibili.com/video/${rec.bvid}';
+    return null;
+  }
 
   Future<void> load() async {
     _loading = true;
     notifyListeners();
     try {
-      _recommendations = await _api.fetch();
+      final recs = await _api.fetch();
+      _recommendations = recs;
       _delights = await _api.fetchDelights(limit: 10);
+      _delightIndex = 0;
       _online = true;
     } catch (_) {
       _online = false;
@@ -53,14 +77,20 @@ class RecommendProvider extends ChangeNotifier {
       final excluded = _recommendations.map((r) => r.bvid).toList();
       final data = await _api.append(excluded);
       final newItems = (data['items'] as List?)?.map((e) => Recommendation.fromJson(e)).toList() ?? [];
-      _recommendations.addAll(newItems);
+      final existingBvids = _recommendations.map((r) => r.bvid).toSet();
+      for (final item in newItems) {
+        if (!existingBvids.contains(item.bvid)) {
+          _recommendations.add(item);
+          existingBvids.add(item.bvid);
+        }
+      }
     } catch (_) {}
     _loading = false;
     notifyListeners();
   }
 
   Future<void> submitFeedback(String bvid, String type, {String? note}) async {
-    await _api.submitFeedback({'bvid': bvid, 'type': type, 'note': ?note});
+    await _api.submitFeedback({'bvid': bvid, 'type': type, if (note != null) 'note': note});
     for (var r in _recommendations) {
       if (r.bvid == bvid) r.feedbackType = type;
     }
@@ -70,6 +100,7 @@ class RecommendProvider extends ChangeNotifier {
   Future<void> respondToDelight(String bvid, String response, {String message = ''}) async {
     await _api.respondToDelight(bvid, response, message: message);
     _delights.removeWhere((d) => d.bvid == bvid);
+    _delightIndex = _delightIndex.clamp(0, (_delights.length - 1).clamp(0, _delights.length));
     notifyListeners();
   }
 

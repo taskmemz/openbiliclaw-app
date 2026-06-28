@@ -45,7 +45,7 @@ class ChatProvider extends ChangeNotifier {
   }
 
   Future<void> _pollForResponse(String turnId) async {
-    for (var i = 0; i < 60; i++) {
+    for (var i = 0; i < 180; i++) {
       await Future.delayed(const Duration(seconds: 1));
       try {
         final turn = await _api.fetchTurn(turnId);
@@ -56,5 +56,8 @@ class ChatProvider extends ChangeNotifier {
         }
       } catch (_) {}
     }
+    _turns.add(ChatTurn(turnId: 'timeout-${DateTime.now().millisecondsSinceEpoch}',
+        role: 'assistant', message: '响应超时，可能是 LLM 比较慢，可以等一下再试一次。'));
+    notifyListeners();
   }
 }
