@@ -21,7 +21,7 @@ class ChatProvider extends ChangeNotifier {
     _loading = true;
     notifyListeners();
     try {
-      _turns = await _api.fetchTurns(session: 'mobile', limit: 50);
+      _turns = await _api.fetchTurns(session: 'popup', limit: 50);
     } catch (_) {}
     _loading = false;
     notifyListeners();
@@ -30,34 +30,47 @@ class ChatProvider extends ChangeNotifier {
   Future<void> sendMessage(String message) async {
     if (message.trim().isEmpty || _responding) return;
     _responding = true;
-    final userTurn = ChatTurn(turnId: DateTime.now().millisecondsSinceEpoch.toString(), role: 'user', message: message);
+    final userTurn = ChatTurn(turnId: DateTime.now().millisecondsSinceEpoch.toString(), message: message, status: 'done');
     _turns.add(userTurn);
     notifyListeners();
 
     try {
-      final result = await _api.startTurn(message: message, session: 'mobile');
+      final result = await _api.startTurn(message: message, session: 'popup');
       await _pollForResponse(result.turnId);
     } catch (e) {
-      _turns.add(ChatTurn(turnId: 'err-${DateTime.now().millisecondsSinceEpoch}', role: 'assistant', message: '抱歉，我暂时没接上。', error: e.toString()));
+      _turns.add(ChatTurn(turnId: 'err-${DateTime.now().millisecondsSinceEpoch}', status: 'error', message: '抱歉，我暂时没接上。', error: e.toString()));
     }
+    _responding = false;
+    notifyListeners();
+  }
+
+  void cancelResponse() {
+    if (!_responding) return;
     _responding = false;
     notifyListeners();
   }
 
   Future<void> _pollForResponse(String turnId) async {
     for (var i = 0; i < 180; i++) {
-      await Future.delayed(const Duration(seconds: 1));
+      if (!_responding) return;
+      await Future.delayed(const Duration(seconds: 2));
       try {
         final turn = await _api.fetchTurn(turnId);
-        if (turn.isAssistant) {
+        if (turn.isDone) {
           _turns.add(turn);
+          notifyListeners();
+          return;
+        }
+        if (turn.hasError) {
+          _turns.add(ChatTurn(turnId: 'err-${DateTime.now().millisecondsSinceEpoch}',
+              status: 'error', message: turn.message.isNotEmpty ? turn.message : '后端处理出错了，请重试。'));
           notifyListeners();
           return;
         }
       } catch (_) {}
     }
     _turns.add(ChatTurn(turnId: 'timeout-${DateTime.now().millisecondsSinceEpoch}',
-        role: 'assistant', message: '响应超时，可能是 LLM 比较慢，可以等一下再试一次。'));
+        status: 'error', message: '等待超时，可能是后端 LLM 比较慢，等一下再试。'));
     notifyListeners();
   }
 }

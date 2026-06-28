@@ -28,9 +28,14 @@ class _ChatViewState extends State<ChatView> {
         AppBar(title: const Text('对话'), centerTitle: true, backgroundColor: theme.colorScheme.surface, elevation: 0),
         Expanded(child: _buildMessages(cp, theme)),
         if (cp.responding)
-          const Padding(padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Row(children: [SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
-              SizedBox(width: 8), Text('思考中…', style: TextStyle(fontSize: 12, color: Colors.grey))])),
+          Container(padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
+              const SizedBox(width: 8), const Text('思考中…', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              const Spacer(),
+              GestureDetector(onTap: () => cp.cancelResponse(),
+                child: const Text('取消', style: TextStyle(fontSize: 12, color: Color(0xFFEF7A86)))),
+            ])),
         _buildInputBar(cp, theme),
       ]);
     });
@@ -51,22 +56,38 @@ class _ChatViewState extends State<ChatView> {
       itemBuilder: (context, index) {
         final turn = cp.turns[index];
         final isUser = turn.isUser;
-        final bubbleColor = isUser ? const Color(0xFFFB7299) : theme.colorScheme.surfaceContainerHighest;
-        final textColor = isUser ? Colors.white : theme.colorScheme.onSurface;
-        final msgRadius = BorderRadius.only(
-          topLeft: const Radius.circular(16),
-          topRight: const Radius.circular(16),
-          bottomLeft: isUser ? const Radius.circular(16) : const Radius.circular(4),
-          bottomRight: isUser ? const Radius.circular(4) : const Radius.circular(16),
-        );
-        final align = isUser ? Alignment.centerRight : Alignment.centerLeft;
-        final msgWidget = Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(color: bubbleColor, borderRadius: msgRadius),
-          child: Text(turn.message, style: TextStyle(color: textColor, fontSize: 14)));
-        return Align(alignment: align, child: msgWidget);
+        final hasResponse = turn.reply.isNotEmpty && turn.isDone;
+        final isError = turn.hasError;
+
+        return Column(crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start, children: [
+          if (turn.message.isNotEmpty)
+            Container(margin: EdgeInsets.only(bottom: hasResponse ? 8 : 12),
+              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFB7299),
+                borderRadius: BorderRadius.circular(16).copyWith(
+                  bottomRight: const Radius.circular(4))),
+              child: Text(turn.message, style: const TextStyle(color: Colors.white, fontSize: 14))),
+          if (hasResponse)
+            Container(margin: const EdgeInsets.only(bottom: 12),
+              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(16).copyWith(
+                  bottomLeft: const Radius.circular(4))),
+              child: Text(turn.reply, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14))),
+          if (isError)
+            Container(margin: const EdgeInsets.only(bottom: 12),
+              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF7A86).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(16)),
+              child: Text(turn.message.isNotEmpty ? turn.message : '出错了，请重试',
+                style: const TextStyle(color: Color(0xFFEF7A86), fontSize: 14))),
+        ]);
       });
   }
 
