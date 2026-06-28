@@ -87,10 +87,27 @@ class RecommendView extends StatelessWidget {
 
   void _openUrl(BuildContext context, String url) async {
     final uri = Uri.tryParse(url);
-    if (uri != null) {
-      try {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } catch (_) {}
+    if (uri == null) return;
+    // Try B站 app scheme first; fall back to browser.
+    final bvid = _extractBvid(url);
+    if (bvid != null) {
+      final appUri = Uri.tryParse('bilibili://video/$bvid');
+      if (appUri != null) {
+        try {
+          if (await canLaunchUrl(appUri)) {
+            await launchUrl(appUri, mode: LaunchMode.externalApplication);
+            return;
+          }
+        } catch (_) {}
+      }
     }
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+  }
+
+  String? _extractBvid(String url) {
+    final match = RegExp(r'(BV[a-zA-Z0-9]+)').firstMatch(url);
+    return match?.group(1);
   }
 }
