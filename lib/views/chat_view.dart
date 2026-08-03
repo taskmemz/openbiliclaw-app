@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/chat_provider.dart';
 
 class ChatView extends StatefulWidget {
@@ -55,38 +57,67 @@ class _ChatViewState extends State<ChatView> {
       itemCount: cp.turns.length,
       itemBuilder: (context, index) {
         final turn = cp.turns[index];
-        final isUser = turn.isUser;
-        final hasResponse = turn.reply.isNotEmpty && turn.isDone;
         final isError = turn.hasError;
+        final hasResponse = turn.reply.isNotEmpty && turn.isDone;
+        final userMessage = isError || turn.message.isEmpty ? null : turn.message;
+        final errorText = isError ? (turn.message.isNotEmpty ? turn.message : '出错了，请重试') : null;
 
-        return Column(crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start, children: [
-          if (turn.message.isNotEmpty)
-            Container(margin: EdgeInsets.only(bottom: hasResponse ? 8 : 12),
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          if (userMessage != null)
+            Align(alignment: Alignment.centerRight, child: Container(
+              margin: EdgeInsets.only(bottom: hasResponse ? 8 : 12),
               constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: const Color(0xFFFB7299),
                 borderRadius: BorderRadius.circular(16).copyWith(
                   bottomRight: const Radius.circular(4))),
-              child: Text(turn.message, style: const TextStyle(color: Colors.white, fontSize: 14))),
+              child: Text(userMessage, style: const TextStyle(color: Colors.white, fontSize: 14)))),
           if (hasResponse)
-            Container(margin: const EdgeInsets.only(bottom: 12),
+            Align(alignment: Alignment.centerLeft, child: Container(
+              margin: const EdgeInsets.only(bottom: 12),
               constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(16).copyWith(
                   bottomLeft: const Radius.circular(4))),
-              child: Text(turn.reply, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14))),
-          if (isError)
-            Container(margin: const EdgeInsets.only(bottom: 12),
+              child: MarkdownBody(
+                data: turn.reply,
+                selectable: true,
+                shrinkWrap: true,
+                onTapLink: (text, href, title) => _openLink(href),
+                styleSheet: MarkdownStyleSheet(
+                  p: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14, height: 1.5),
+                  listBullet: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14),
+                  code: TextStyle(
+                    color: theme.colorScheme.onSurface,
+                    fontSize: 13,
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                    fontFamily: 'monospace',
+                  ),
+                  codeblockDecoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  blockquoteDecoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  blockquote: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14),
+                  a: const TextStyle(color: Color(0xFFFB7299), decoration: TextDecoration.underline),
+                ),
+              ))),
+          if (errorText != null)
+            Align(alignment: Alignment.centerLeft, child: Container(
+              margin: const EdgeInsets.only(bottom: 12),
               constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: const Color(0xFFEF7A86).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16)),
-              child: Text(turn.message.isNotEmpty ? turn.message : '出错了，请重试',
-                style: const TextStyle(color: Color(0xFFEF7A86), fontSize: 14))),
+              child: Text(errorText,
+                style: const TextStyle(color: Color(0xFFEF7A86), fontSize: 14)))),
         ]);
       });
   }
@@ -120,5 +151,12 @@ class _ChatViewState extends State<ChatView> {
         }
       });
     });
+  }
+
+  void _openLink(String? href) {
+    if (href == null || href.isEmpty) return;
+    final uri = Uri.tryParse(href);
+    if (uri == null) return;
+    launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 }

@@ -33,7 +33,7 @@ class ChatTurn {
   );
 
   bool get isUser => true;
-  bool get isDone => status == 'done' || status == 'ok';
+  bool get isDone => status == 'done' || status == 'ok' || status == 'completed';
   bool get hasError => status == 'error' || status == 'failed' || error.isNotEmpty;
   bool get isPending => status == 'pending' || status == 'processing';
 }

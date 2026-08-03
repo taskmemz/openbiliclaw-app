@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
+// ponytail: dart:io WebSocket 仅原生平台（移动/桌面）；web 平台跑不了就退化轮询，需要 web 支持时换 web_socket_channel
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../api/client.dart';
 import '../api/recommend_api.dart';
@@ -7,6 +10,7 @@ import '../models/delight.dart';
 
 class RecommendProvider extends ChangeNotifier {
   final RecommendApi _api;
+  final ApiClient _client;
 
   List<Recommendation> _recommendations = [];
   List<Delight> _delights = [];
@@ -15,8 +19,13 @@ class RecommendProvider extends ChangeNotifier {
   bool _online = false;
   String _runtimeSummary = '';
   Timer? _pollTimer;
+  WebSocket? _ws;
+  Timer? _reconnectTimer;
+  bool _wsConnecting = false;
 
-  RecommendProvider(ApiClient client) : _api = RecommendApi(client);
+  RecommendProvider(ApiClient client)
+      : _client = client,
+        _api = RecommendApi(client);
 
   List<Recommendation> get recommendations => _recommendations;
   List<Delight> get delights => _delights;
@@ -89,10 +98,10 @@ class RecommendProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> submitFeedback(String bvid, String type, {String? note}) async {
-    await _api.submitFeedback({'bvid': bvid, 'type': type, if (note != null) 'note': note});
+  Future<void> submitFeedback(Recommendation rec, String type, {String? note}) async {
+    await _api.submitFeedback(rec.id, rec.bvid, type, note: note);
     for (var r in _recommendations) {
-      if (r.bvid == bvid) r.feedbackType = type;
+      if (r.bvid == rec.bvid) r.feedbackType = type;
     }
     notifyListeners();
   }
@@ -105,17 +114,22 @@ class RecommendProvider extends ChangeNotifier {
   }
 
   Future<void> reportClick(Recommendation rec) async {
-    await _api.reportClick({'bvid': rec.bvid, 'title': rec.title, 'up_name': rec.upName, 'source_platform': rec.sourcePlatform, 'content_url': rec.contentUrl});
+    await _api.reportClick({'recommendation_id': rec.id, 'bvid': rec.bvid, 'title': rec.title, 'up_name': rec.upName, 'source_platform': rec.sourcePlatform, 'content_url': rec.contentUrl});
   }
 
   void startPolling() {
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) => _poll());
+    _connectStream();
   }
 
   void stopPolling() {
     _pollTimer?.cancel();
     _pollTimer = null;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _ws?.close();
+    _ws = null;
   }
 
   Future<void> _poll() async {
@@ -126,10 +140,52 @@ class RecommendProvider extends ChangeNotifier {
         _runtimeSummary = '${status.length} 条推荐待看';
         notifyListeners();
       }
+      if (_delights.isEmpty) {
+        final delights = await _api.fetchDelights(limit: 10);
+        if (delights.isNotEmpty) {
+          _delights = delights;
+          _delightIndex = 0;
+          notifyListeners();
+        }
+      }
     } catch (_) {
       _online = false;
       notifyListeners();
     }
+  }
+
+  Future<void> _connectStream() async {
+    if (_wsConnecting || _ws != null) return;
+    _wsConnecting = true;
+    try {
+      final ws = await WebSocket.connect(_client.wsUrl, headers: _client.wsHeaders);
+      _ws = ws;
+      ws.listen((raw) {
+        try {
+          final event = jsonDecode(raw as String) as Map<String, dynamic>;
+          final type = event['type'] as String? ?? '';
+          if (type.isNotEmpty && type != 'runtime.heartbeat') _poll();
+        } catch (_) {}
+      }, onDone: () {
+        _ws = null;
+        _scheduleReconnect();
+      }, onError: (_) {
+        _ws = null;
+        _scheduleReconnect();
+      });
+    } catch (_) {
+      _scheduleReconnect();
+    } finally {
+      _wsConnecting = false;
+    }
+  }
+
+  void _scheduleReconnect() {
+    if (_reconnectTimer != null) return;
+    _reconnectTimer = Timer(const Duration(seconds: 10), () {
+      _reconnectTimer = null;
+      _connectStream();
+    });
   }
 
   @override

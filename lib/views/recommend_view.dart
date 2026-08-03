@@ -74,8 +74,8 @@ class RecommendView extends StatelessWidget {
                   final url = rp.contentUrlFor(rec);
                   if (url != null) _openUrl(context, url);
                 },
-                onLike: () => rp.submitFeedback(rec.bvid, 'like'),
-                onDislike: () => rp.submitFeedback(rec.bvid, 'dislike'),
+                onLike: () => rp.submitFeedback(rec, 'like'),
+                onDislike: () => rp.submitFeedback(rec, 'dislike'),
               )).toList(),
             )),
           if (rp.recommendations.isNotEmpty)

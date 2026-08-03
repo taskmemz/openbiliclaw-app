@@ -56,21 +56,23 @@ class ChatProvider extends ChangeNotifier {
       await Future.delayed(const Duration(seconds: 2));
       try {
         final turn = await _api.fetchTurn(turnId);
-        if (turn.isDone) {
-          _turns.add(turn);
-          notifyListeners();
-          return;
-        }
-        if (turn.hasError) {
-          _turns.add(ChatTurn(turnId: 'err-${DateTime.now().millisecondsSinceEpoch}',
-              status: 'error', message: turn.message.isNotEmpty ? turn.message : '后端处理出错了，请重试。'));
+        if (turn.isDone || turn.hasError) {
+          _replaceLastTurn(turn);
           notifyListeners();
           return;
         }
       } catch (_) {}
     }
-    _turns.add(ChatTurn(turnId: 'timeout-${DateTime.now().millisecondsSinceEpoch}',
+    _replaceLastTurn(ChatTurn(turnId: 'timeout-${DateTime.now().millisecondsSinceEpoch}',
         status: 'error', message: '等待超时，可能是后端 LLM 比较慢，等一下再试。'));
     notifyListeners();
+  }
+
+  void _replaceLastTurn(ChatTurn turn) {
+    if (_turns.isNotEmpty) {
+      _turns[_turns.length - 1] = turn;
+    } else {
+      _turns.add(turn);
+    }
   }
 }

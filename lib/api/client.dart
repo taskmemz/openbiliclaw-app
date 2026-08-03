@@ -5,12 +5,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ApiClient {
   static const String _hostKey = 'api_host';
   static const String _portKey = 'api_port';
+  static const String _sessionKey = 'session_token';
   static const String _defaultHost = '127.0.0.1';
   static const int _defaultPort = 8420;
 
   String _host = _defaultHost;
   int _port = _defaultPort;
   bool _authenticated = false;
+  String _sessionToken = '';
 
   ApiClient();
 
@@ -19,23 +21,56 @@ class ApiClient {
   String get host => _host;
   int get port => _port;
   bool get isAuthenticated => _authenticated;
+  Map<String, String> get wsHeaders => _sessionToken.isNotEmpty ? {'Cookie': 'obc_session=$_sessionToken'} : const {};
 
   Future<void> loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     _host = prefs.getString(_hostKey) ?? _defaultHost;
     _port = prefs.getInt(_portKey) ?? _defaultPort;
+    _sessionToken = prefs.getString(_sessionKey) ?? '';
   }
 
   Future<void> saveSettings(String host, int port) async {
+    final changed = host != _host || port != _port;
     _host = host;
     _port = port;
+    if (changed) clearSession();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_hostKey, host);
     await prefs.setInt(_portKey, port);
   }
 
+  void clearSession() {
+    _sessionToken = '';
+    _authenticated = false;
+    SharedPreferences.getInstance().then((prefs) => prefs.remove(_sessionKey));
+  }
+
+  void _captureSession(http.Response res) {
+    final setCookie = res.headers['set-cookie'];
+    if (setCookie == null) return;
+    final match = RegExp(r'obc_session=([^;]*)').firstMatch(setCookie);
+    if (match == null) return;
+    final token = match.group(1) ?? '';
+    if (token.isEmpty) {
+      clearSession();
+      return;
+    }
+    _sessionToken = token;
+    _authenticated = true;
+    SharedPreferences.getInstance().then((prefs) => prefs.setString(_sessionKey, token));
+  }
+
   Map<String, String> _headers() {
-    return {'Content-Type': 'application/json', 'X-OBC-Auth': '1'};
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      'X-OBC-Auth': '1',
+    };
+    if (_sessionToken.isNotEmpty) {
+      headers['Cookie'] = 'obc_session=$_sessionToken';
+      headers['Origin'] = 'http://$_host:$_port';
+    }
+    return headers;
   }
 
   Future<Map<String, dynamic>> get(String path, {int? timeout}) async {
@@ -43,7 +78,8 @@ class ApiClient {
     final client = http.Client();
     try {
       final res = await client.get(uri, headers: _headers()).timeout(Duration(seconds: timeout ?? 10));
-      if (res.statusCode == 401) _authenticated = false;
+      _captureSession(res);
+      if (res.statusCode == 401) clearSession();
       if (res.statusCode >= 400) throw ApiException(res.statusCode, res.body);
       return jsonDecode(res.body);
     } finally {
@@ -57,7 +93,8 @@ class ApiClient {
     try {
       final res = await client.post(uri, headers: _headers(), body: body != null ? jsonEncode(body) : null)
           .timeout(Duration(seconds: timeout ?? 10));
-      if (res.statusCode == 401) _authenticated = false;
+      _captureSession(res);
+      if (res.statusCode == 401) clearSession();
       if (res.statusCode >= 400) throw ApiException(res.statusCode, res.body);
       return jsonDecode(res.body);
     } finally {
@@ -70,7 +107,8 @@ class ApiClient {
     final client = http.Client();
     try {
       final res = await client.delete(uri, headers: _headers()).timeout(const Duration(seconds: 10));
-      if (res.statusCode == 401) _authenticated = false;
+      _captureSession(res);
+      if (res.statusCode == 401) clearSession();
       if (res.statusCode >= 400) throw ApiException(res.statusCode, res.body);
       return res.body.isNotEmpty ? jsonDecode(res.body) : {};
     } finally {

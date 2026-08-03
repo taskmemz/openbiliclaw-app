@@ -1,6 +1,10 @@
+import 'dart:math';
 import '../models/recommendation.dart';
 import '../models/delight.dart';
 import 'client.dart';
+
+String _newRequestId(String prefix) =>
+    '$prefix-${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}';
 
 class RecommendApi {
   final ApiClient _client;
@@ -17,11 +21,23 @@ class RecommendApi {
       _client.post('/recommendations/append', body: {'excluded_bvids': excludedBvids});
 
   Future<void> reportClick(Map<String, dynamic> payload) async {
-    try { await _client.post('/recommendation-click', body: payload); } catch (_) {}
+    try {
+      await _client.post('/recommendation-click', body: {
+        ...payload,
+        'request_id': _newRequestId('click'),
+      });
+    } catch (_) {}
   }
 
-  Future<void> submitFeedback(Map<String, dynamic> payload) async {
-    try { await _client.post('/feedback', body: payload); } catch (_) {}
+  Future<void> submitFeedback(int recommendationId, String bvid, String type, {String? note}) async {
+    try {
+      await _client.post('/feedback', body: {
+        'recommendation_id': recommendationId,
+        'feedback_type': type,
+        'note': note ?? '',
+        'request_id': _newRequestId('fb'),
+      });
+    } catch (_) {}
   }
 
   Future<Map<String, dynamic>> refresh() => _client.post('/recommendations/refresh');
