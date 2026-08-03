@@ -7,10 +7,8 @@ class RecommendationCard extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onLike;
   final VoidCallback? onDislike;
-  final VoidCallback? onWatchLater;
-  final VoidCallback? onFavorite;
 
-  const RecommendationCard({super.key, required this.rec, this.onTap, this.onLike, this.onDislike, this.onWatchLater, this.onFavorite});
+  const RecommendationCard({super.key, required this.rec, this.onTap, this.onLike, this.onDislike});
 
   @override
   Widget build(BuildContext context) {
@@ -43,10 +41,6 @@ class RecommendationCard extends StatelessWidget {
           _feedbackIcon(Icons.thumb_up_outlined, rec.feedbackType == 'like', () => onLike?.call()),
           const SizedBox(width: 16),
           _feedbackIcon(Icons.thumb_down_outlined, rec.feedbackType == 'dislike', () => onDislike?.call()),
-          const SizedBox(width: 16),
-          _feedbackIcon(Icons.access_time, false, () => onWatchLater?.call()),
-          const SizedBox(width: 16),
-          _feedbackIcon(Icons.star_outline, false, () => onFavorite?.call()),
         ]),
       ])),
     ]);

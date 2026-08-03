@@ -15,8 +15,6 @@ class RecommendApi {
     return (data['items'] as List?)?.map((e) => Recommendation.fromJson(e)).toList() ?? [];
   }
 
-  Future<Map<String, dynamic>> reshuffle() => _client.post('/recommendations/reshuffle');
-
   Future<Map<String, dynamic>> append(List<String> excludedBvids) =>
       _client.post('/recommendations/append', body: {'excluded_bvids': excludedBvids});
 

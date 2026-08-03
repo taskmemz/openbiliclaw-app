@@ -24,7 +24,7 @@ class ProfileProvider extends ChangeNotifier {
     _loading = true;
     notifyListeners();
     try {
-      _summary = await _api.fetchSummary(limit: 5);
+      _summary = await _api.fetchSummary();
     } catch (_) {}
     _loading = false;
     notifyListeners();

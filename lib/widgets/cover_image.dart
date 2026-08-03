@@ -19,7 +19,7 @@ class CoverImage extends StatelessWidget {
         child: const Icon(Icons.movie_outlined, color: Colors.grey, size: 40));
     }
     final client = context.read<ApiClient>();
-    final proxyUrl = proxyImageUrl(url, client.baseUrl);
+    final proxyUrl = proxyImageUrl(url, client.baseUrl, token: client.sessionToken);
     return ClipRRect(borderRadius: BorderRadius.circular(borderRadius),
       child: CachedNetworkImage(imageUrl: proxyUrl, width: width, height: height, fit: BoxFit.cover,
         placeholder: (_, _) => Container(color: Colors.grey[200]),

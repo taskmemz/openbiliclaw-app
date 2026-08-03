@@ -11,7 +11,6 @@ class ApiClient {
 
   String _host = _defaultHost;
   int _port = _defaultPort;
-  bool _authenticated = false;
   String _sessionToken = '';
 
   ApiClient();
@@ -20,7 +19,7 @@ class ApiClient {
   String get wsUrl => 'ws://$_host:$_port/api/runtime-stream';
   String get host => _host;
   int get port => _port;
-  bool get isAuthenticated => _authenticated;
+  String get sessionToken => _sessionToken;
   Map<String, String> get wsHeaders => _sessionToken.isNotEmpty ? {'Cookie': 'obc_session=$_sessionToken'} : const {};
 
   Future<void> loadSettings() async {
@@ -42,7 +41,6 @@ class ApiClient {
 
   void clearSession() {
     _sessionToken = '';
-    _authenticated = false;
     SharedPreferences.getInstance().then((prefs) => prefs.remove(_sessionKey));
   }
 
@@ -57,7 +55,6 @@ class ApiClient {
       return;
     }
     _sessionToken = token;
-    _authenticated = true;
     SharedPreferences.getInstance().then((prefs) => prefs.setString(_sessionKey, token));
   }
 

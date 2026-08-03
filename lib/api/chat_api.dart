@@ -5,13 +5,9 @@ class ChatApi {
   final ApiClient _client;
   ChatApi(this._client);
 
-  Future<ChatTurn> startTurn({String turnId = '', String session = 'mobile', String scope = 'chat', String subjectId = '', String subjectTitle = '', required String message}) async {
+  Future<ChatTurn> startTurn({String session = 'mobile', required String message}) async {
     final data = await _client.post('/chat/turns', body: {
-      'turn_id': turnId,
       'session': session,
-      'scope': scope,
-      'subject_id': subjectId,
-      'subject_title': subjectTitle,
       'message': message,
     });
     return ChatTurn.fromJson(data);

@@ -15,8 +15,14 @@ String decodeHtml(String text) {
 
 /// Build a proxy URL for cover images through the backend.
 /// Direct URLs are often blocked by CORS.
-String proxyImageUrl(String url, String baseUrl) {
+/// When the backend password gate is on, image-proxy requires auth; pass the
+/// session token as the query token the backend accepts on this path only.
+String proxyImageUrl(String url, String baseUrl, {String? token}) {
   if (url.isEmpty) return '';
   final apiBase = baseUrl.replaceAll('/api', '');
-  return '$apiBase/api/image-proxy?url=${Uri.encodeComponent(url)}';
+  var result = '$apiBase/api/image-proxy?url=${Uri.encodeComponent(url)}';
+  if (token != null && token.isNotEmpty) {
+    result += '&token=${Uri.encodeComponent(token)}';
+  }
+  return result;
 }

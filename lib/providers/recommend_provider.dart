@@ -17,7 +17,6 @@ class RecommendProvider extends ChangeNotifier {
   int _delightIndex = 0;
   bool _loading = false;
   bool _online = false;
-  String _runtimeSummary = '';
   Timer? _pollTimer;
   WebSocket? _ws;
   Timer? _reconnectTimer;
@@ -32,11 +31,6 @@ class RecommendProvider extends ChangeNotifier {
   int get delightIndex => _delightIndex;
   bool get loading => _loading;
   bool get online => _online;
-  String get runtimeSummary => _runtimeSummary;
-
-  void setDelightIndex(int i) {
-    if (i >= 0 && i < _delights.length) _delightIndex = i;
-  }
 
   void nextDelight() {
     if (_delights.isNotEmpty) _delightIndex = (_delightIndex + 1) % _delights.length;
@@ -70,16 +64,7 @@ class RecommendProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> reshuffle() async {
-    try {
-      final data = await _api.reshuffle();
-      _recommendations = (data['items'] as List?)?.map((e) => Recommendation.fromJson(e)).toList() ?? [];
-      notifyListeners();
-    } catch (_) {}
-  }
-
-  Future<void> append() async {
-    if (_loading) return;
+  Future<void> append() async {    if (_loading) return;
     _loading = true;
     notifyListeners();
     try {
@@ -136,10 +121,6 @@ class RecommendProvider extends ChangeNotifier {
     try {
       final status = await _api.fetch(timeout: 5);
       _online = true;
-      if (status.isNotEmpty) {
-        _runtimeSummary = '${status.length} 条推荐待看';
-        notifyListeners();
-      }
       if (_delights.isEmpty) {
         final delights = await _api.fetchDelights(limit: 10);
         if (delights.isNotEmpty) {

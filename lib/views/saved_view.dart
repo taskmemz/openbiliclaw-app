@@ -10,7 +10,9 @@ class SavedView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final baseUrl = context.read<ApiClient>().baseUrl;
+    final client = context.read<ApiClient>();
+    final baseUrl = client.baseUrl;
+    final token = client.sessionToken;
     return Consumer<SavedProvider>(builder: (context, sp, _) {
       return DefaultTabController(length: 2, child: Scaffold(
         appBar: AppBar(title: const Text('收藏'), centerTitle: true, backgroundColor: theme.colorScheme.surface, elevation: 0,
@@ -19,14 +21,14 @@ class SavedView extends StatelessWidget {
             Tab(text: '稍后再看'), Tab(text: '我的收藏'),
           ])),
         body: TabBarView(children: [
-          _buildList(theme, baseUrl, sp.watchLater, '还没有稍后再看的内容', () => sp.loadWatchLater()),
-          _buildList(theme, baseUrl, sp.favorites, '还没有收藏的内容', () => sp.loadFavorites()),
+          _buildList(theme, baseUrl, token, sp.watchLater, '还没有稍后再看的内容', () => sp.loadWatchLater()),
+          _buildList(theme, baseUrl, token, sp.favorites, '还没有收藏的内容', () => sp.loadFavorites()),
         ]),
       ));
     });
   }
 
-  Widget _buildList(ThemeData theme, String baseUrl, List<SavedItem> items, String emptyText, VoidCallback onRefresh) {
+  Widget _buildList(ThemeData theme, String baseUrl, String token, List<SavedItem> items, String emptyText, VoidCallback onRefresh) {
     return RefreshIndicator(onRefresh: () async => onRefresh(),
       child: ListView.separated(padding: const EdgeInsets.all(16),
         itemCount: items.length,
@@ -37,7 +39,7 @@ class SavedView extends StatelessWidget {
             leading: item.coverUrl.isNotEmpty
               ? ClipRRect(borderRadius: BorderRadius.circular(8),
                   child: SizedBox(width: 64, height: 48,
-                    child: Image.network(proxyImageUrl(item.coverUrl, baseUrl), fit: BoxFit.cover, errorBuilder: (_, _, _) => Container(color: Colors.grey[200]))))
+                    child: Image.network(proxyImageUrl(item.coverUrl, baseUrl, token: token), fit: BoxFit.cover, errorBuilder: (_, _, _) => Container(color: Colors.grey[200]))))
               : Container(width: 64, height: 48, decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(8)),
                   child: const Icon(Icons.movie_outlined, color: Colors.grey)),
             title: Text(item.title.isNotEmpty ? item.title : '未命名', style: theme.textTheme.bodyMedium, maxLines: 2, overflow: TextOverflow.ellipsis),

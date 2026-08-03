@@ -3,22 +3,18 @@ import '../api/client.dart';
 import '../api/saved_api.dart';
 
 class SavedItem {
-  final String id;
   final String bvid;
   final String title;
   final String coverUrl;
   final String upName;
-  final String reason;
 
-  SavedItem({required this.id, required this.bvid, this.title = '', this.coverUrl = '', this.upName = '', this.reason = ''});
+  SavedItem({required this.bvid, this.title = '', this.coverUrl = '', this.upName = ''});
 
   factory SavedItem.fromJson(Map<String, dynamic> json) => SavedItem(
-    id: json['id']?.toString() ?? '',
     bvid: json['bvid'] ?? '',
     title: json['title'] ?? '',
     coverUrl: json['cover_url'] ?? '',
     upName: json['up_name'] ?? '',
-    reason: json['reason'] ?? '',
   );
 }
 
