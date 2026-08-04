@@ -24,7 +24,8 @@ class CoverImage extends StatelessWidget {
     final headers = token.isNotEmpty ? {'Cookie': 'obc_session=$token'} : null;
     return ClipRRect(borderRadius: BorderRadius.circular(borderRadius),
       child: CachedNetworkImage(
-        imageProvider: CachedNetworkImageProvider(proxyUrl, headers: headers),
+        imageUrl: proxyUrl,
+        httpHeaders: headers,
         width: width, height: height, fit: BoxFit.cover,
         placeholder: (_, _) => Container(color: Colors.grey[200]),
         errorWidget: (_, _, _) => Container(color: Colors.grey[200], child: const Icon(Icons.broken_image, color: Colors.grey))));
