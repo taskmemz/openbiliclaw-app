@@ -35,11 +35,12 @@ class SavedView extends StatelessWidget {
         separatorBuilder: (_, _) => const Divider(height: 1),
         itemBuilder: (context, index) {
           final item = items[index];
+          final headers = token.isNotEmpty ? {'Cookie': 'obc_session=$token'} : null;
           return ListTile(contentPadding: const EdgeInsets.symmetric(vertical: 4),
             leading: item.coverUrl.isNotEmpty
               ? ClipRRect(borderRadius: BorderRadius.circular(8),
                   child: SizedBox(width: 64, height: 48,
-                    child: Image.network(proxyImageUrl(item.coverUrl, baseUrl, token: token), fit: BoxFit.cover, errorBuilder: (_, _, _) => Container(color: Colors.grey[200]))))
+                    child: Image.network(proxyImageUrl(item.coverUrl, baseUrl, token: token), headers: headers, fit: BoxFit.cover, errorBuilder: (_, _, _) => Container(color: Colors.grey[200]))))
               : Container(width: 64, height: 48, decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(8)),
                   child: const Icon(Icons.movie_outlined, color: Colors.grey)),
             title: Text(item.title.isNotEmpty ? item.title : '未命名', style: theme.textTheme.bodyMedium, maxLines: 2, overflow: TextOverflow.ellipsis),
