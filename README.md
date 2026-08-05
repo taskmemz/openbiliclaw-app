@@ -1,17 +1,39 @@
-# openbiliclaw_app
+# OpenBiliClaw — Flutter 移动客户端
 
-A new Flutter project.
+OpenBiliClaw 的 Flutter 移动客户端（B 站第三方客户端），连接自建的
+[OpenBiliClaw](https://github.com/whiteguo233/OpenBiliClaw) 后端服务（提供 B 站数据 + AI 能力）。
 
-## Getting Started
+## 使用逻辑
 
-This project is a starting point for a Flutter application.
+App 采用「客户端 + 后端」架构，使用流程：
 
-A few resources to get you started if this is your first Flutter project:
+1. **配置后端连接**：右上角 ⚙️ 进入连接设置，填后端 IP/端口
+   （默认 `127.0.0.1:8420` 本机后端；远程部署填服务器 IP，后端开启密码门禁）。
+   保存后重启应用生效，可点「测试连接」验证。
+2. **推荐页**：从后端拉取「为你推荐」视频流，支持下拉刷新；
+   离线时提示「无法连接后端」。
+3. **对话页**：与 AI 对话，告诉它你喜欢的 UP 主/内容类型，AI 据此调整推荐。
+4. **画像页**：展示 AI 建立的用户兴趣画像；用得越多、画像越准、推荐越精准
+   （初期提示「画像还在慢慢攒，先多看一阵」）。
+5. **收藏页**：管理「稍后再看」和「我的收藏」。
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+> 一句话：连上后端 → 浏览积累数据 → AI 建立画像 → 对话微调偏好 → 获得越来越精准的推荐。
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## 特性
+
+- 推荐 / 稍后再看 / 收藏浏览 + AI 对话 / 用户画像
+- 🖼️ **封面图 B 站 CDN 直连**（原生端跳过服务端代理，省两跳；web 端因 CORS 限制仍走代理）
+- 封面图 / 已保存视图请求头会话管理优化
+- API 返回数据处理调整
+- 支持 Android / iOS / Web / Linux / macOS / Windows
+- CI 构建 release APK 并发布 GitHub Release
+
+## 环境与后端配置
+
+- Flutter 3.x
+- 自建 OpenBiliClaw 后端
+- 默认连接 `127.0.0.1:8420`（本机后端），远程部署在设置页改为服务器地址。
+
+## License
+
+[MIT](LICENSE)
